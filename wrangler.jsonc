@@ -2,6 +2,9 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mulya-astra",
   "main": ".open-next/worker.js",
+  "build": {
+    "command": "npm run build:cloudflare"
+  },
   "compatibility_date": "2026-08-15",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
