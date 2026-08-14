@@ -7,7 +7,7 @@
     "build": "next build",
     "build:cloudflare": "opennextjs-cloudflare build",
     "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy:cloudflare": "wrangler deploy",
+    "deploy:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "start": "concurrently --kill-others --names web,worker \"next start\" \"npm run worker\"",
     "worker": "tsx scripts/evaluation-worker.ts",
     "lint": "next lint",
