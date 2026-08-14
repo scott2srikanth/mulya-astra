@@ -1,15 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ChartBar as BarChart3, TrendingUp, Users, Brain, Code as Code2, Star, Award, Target } from 'lucide-react';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 import type { Evaluation } from '@/types/database';
 
 const HIRING_COLORS: Record<string, string> = {
@@ -71,30 +68,15 @@ function avgOf(items: Evaluation[], key: keyof Evaluation, max: number): number 
 }
 
 export default function AnalyticsPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/login');
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('evaluations').select('*').then(({ data }) => {
-      if (data) setEvaluations(data as Evaluation[]);
+    fetch('/api/evaluations', {cache:'no-store'}).then(async response => {
+      if (response.ok) setEvaluations(await response.json());
       setLoading(false);
     });
-  }, [user]);
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
+  }, []);
 
   if (loading) {
     return (

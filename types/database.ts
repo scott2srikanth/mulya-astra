@@ -52,9 +52,25 @@ export interface Evaluation {
   frameworks_detected: string[];
   ai_tools_detected: string[];
   repo_stats: RepoStats;
+  assignment_spec?: AssignmentSpec | null;
+  assignment_results?: AssignmentEvaluation | null;
   created_at: string;
   updated_at: string;
 }
+
+export interface AssignmentSpec {
+  brief: string;
+  required_paths: string[];
+  required_functions: string[];
+  ui_requirements: string[];
+  model_requirements: string[];
+  endpoints: Array<{ method:string; path:string; description:string }>;
+  forbidden_patterns: string[];
+  assignment_weight: number;
+}
+
+export interface AssignmentCheck { id:string; category:'architecture'|'functions'|'ui'|'model'|'endpoints'|'constraints'; requirement:string; status:'passed'|'failed'|'needs_ai'; points:number; max_points:number; evidence:string[]; explanation:string }
+export interface AssignmentEvaluation { compliance_score:number; engineering_score:number; final_weighted_score:number; assignment_weight:number; checks:AssignmentCheck[]; summary:string }
 
 export type EvaluationInsert = Omit<Evaluation, 'id' | 'created_at' | 'updated_at'> & {
   id?: string;
@@ -77,7 +93,48 @@ export interface RepoStats {
   contributors?: number;
   lines_of_code?: number;
   file_count?: number;
+  analyzed_file_count?: number;
+  test_file_count?: number;
+  commit_sha?: string;
+  truncated?: boolean;
   last_commit?: string;
+}
+
+export interface AnalysisFinding {
+  id: string;
+  evaluation_id: string;
+  category: 'implementation' | 'architecture' | 'quality' | 'testing' | 'security' | 'performance' | 'documentation';
+  severity: 'info' | 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  explanation: string;
+  file_path: string | null;
+  start_line: number | null;
+  evidence: string;
+  recommendation: string | null;
+  rule_id: string;
+  confidence: number;
+  created_at: string;
+}
+
+export interface CategoryScore {
+  category: AnalysisFinding['category'];
+  score: number;
+  max_score: number;
+  confidence: number;
+  rationale: string;
+}
+
+export interface ManualAiReview {
+  schema_version: '1.0';
+  evaluation_id: string;
+  commit_sha: string;
+  model_label: string;
+  review_summary: string;
+  confidence: number;
+  architecture_observations: Array<{ title:string; explanation:string; impact:'low'|'medium'|'high'; evidence_refs:string[]; confidence:number }>;
+  prioritized_risks: Array<{ title:string; severity:'low'|'medium'|'high'|'critical'; explanation:string; evidence_refs:string[]; mitigation:string }>;
+  recommendations: Array<{ title:string; priority:1|2|3; rationale:string; evidence_refs:string[]; implementation_steps:string[] }>;
+  rubric_advice: Array<{ category:AnalysisFinding['category']; suggested_delta:number; rationale:string; evidence_refs:string[] }>;
 }
 
 export interface EvaluationAgent {

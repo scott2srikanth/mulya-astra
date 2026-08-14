@@ -1,11 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Brain, Zap, GitBranch, ChartBar as BarChart3, TrendingUp, Clock, CircleCheck as CheckCircle2, ArrowRight, Star, Users, Code as Code2, Shield, Cpu, Eye } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 import type { Evaluation } from '@/types/database';
 import ScoreGauge from '@/components/ScoreGauge';
 import GradeTag from '@/components/GradeTag';
@@ -29,27 +26,18 @@ const FEATURES = [
 ];
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
   const [recentEvaluations, setRecentEvaluations] = useState<Evaluation[]>([]);
   const [stats, setStats] = useState({ total: 0, completed: 0, avgScore: 0, hireRate: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/login');
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (user) fetchData();
-  }, [user]);
+    fetchData();
+  }, []);
 
   async function fetchData() {
     try {
-      const { data } = await supabase
-        .from('evaluations')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const response = await fetch('/api/evaluations', { cache: 'no-store' });
+      const data: Evaluation[] = response.ok ? (await response.json()).slice(0, 5) : [];
 
       if (data) {
         setRecentEvaluations(data as Evaluation[]);
@@ -67,14 +55,6 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
   }
 
   return (

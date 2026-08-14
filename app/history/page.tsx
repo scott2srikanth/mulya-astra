@@ -1,11 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { History, Search, GitBranch, ArrowRight, Filter, Dessert as SortDesc, Trash2, TriangleAlert as AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 import type { Evaluation, EvaluationStatus } from '@/types/database';
 import ScoreGauge from '@/components/ScoreGauge';
 import StatusBadge from '@/components/StatusBadge';
@@ -15,8 +12,6 @@ import HiringBadge from '@/components/HiringBadge';
 const STATUS_OPTIONS: (EvaluationStatus | 'all')[] = ['all', 'completed', 'evaluating', 'running', 'analyzing', 'pending', 'failed'];
 
 export default function HistoryPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [filtered, setFiltered] = useState<Evaluation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,12 +21,8 @@ export default function HistoryPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push('/login');
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    if (user) fetchEvaluations();
-  }, [user]);
+    fetchEvaluations();
+  }, []);
 
   useEffect(() => {
     let result = [...evaluations];
@@ -56,23 +47,15 @@ export default function HistoryPage() {
   }, [evaluations, search, statusFilter, sortBy]);
 
   async function fetchEvaluations() {
-    const { data } = await supabase.from('evaluations').select('*').order('created_at', { ascending: false });
-    if (data) setEvaluations(data as Evaluation[]);
+    const response=await fetch('/api/evaluations', {cache:'no-store'});
+    if (response.ok) setEvaluations(await response.json());
     setLoading(false);
   }
 
   async function handleDelete(id: string) {
-    await supabase.from('evaluations').delete().eq('id', id);
-    setEvaluations(prev => prev.filter(e => e.id !== id));
+    const response=await fetch(`/api/evaluations/${id}`, {method:'DELETE'});
+    if (response.ok) setEvaluations(prev => prev.filter(e => e.id !== id));
     setDeleteId(null);
-  }
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-      </div>
-    );
   }
 
   return (

@@ -74,6 +74,9 @@ export default function AgentCard({ agent, compact }: AgentCardProps) {
           {agent.score !== null && (
             <p className={cn('text-2xl font-bold tabular-nums', color)}>{agent.score}<span className="text-sm text-muted-foreground font-normal">/100</span></p>
           )}
+          {agent.score === null && agent.status === 'completed' && (
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Not applicable</p>
+          )}
         </div>
       </div>
 
@@ -103,6 +106,20 @@ export default function AgentCard({ agent, compact }: AgentCardProps) {
               <li key={i} className="text-xs text-muted-foreground flex gap-2">
                 <span className="text-rose-400 shrink-0">−</span>
                 {w}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {agent.suggestions && agent.suggestions.length > 0 && (
+        <div className="mt-3 border-t border-border pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-400">Recommended actions</p>
+          <ul className="space-y-1">
+            {agent.suggestions.slice(0, 3).map((suggestion, i) => (
+              <li key={i} className="flex gap-2 text-xs text-muted-foreground">
+                <span className="shrink-0 text-sky-400">→</span>
+                {suggestion}
               </li>
             ))}
           </ul>

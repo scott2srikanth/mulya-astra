@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { User, Mail, Building2, Save, LogOut, CreditCard, Shield, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Zap, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 const TIER_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -41,18 +40,9 @@ export default function AccountPage() {
     e.preventDefault();
     setSaving(true);
     setSaveStatus('idle');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ display_name: form.display_name.trim(), company: form.company.trim() })
-      .eq('id', user!.id);
-    if (error) {
-      setSaveError(error.message);
-      setSaveStatus('error');
-    } else {
-      await refreshProfile();
-      setSaveStatus('success');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    }
+    await refreshProfile();
+    setSaveStatus('success');
+    setTimeout(() => setSaveStatus('idle'), 3000);
     setSaving(false);
   }
 

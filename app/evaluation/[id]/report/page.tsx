@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Download, GitBranch, User, Hash, BookOpen, Brain, CircleCheck as CheckCircle2, Star, TrendingUp, TriangleAlert as AlertTriangle, Code as Code2, Cpu, Eye, Shield, Users, FileText, Printer } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import type { Evaluation, EvaluationAgent } from '@/types/database';
 import ScoreGauge from '@/components/ScoreGauge';
 import GradeTag from '@/components/GradeTag';
@@ -42,12 +41,8 @@ export default function ReportPage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [{ data: ev }, { data: ag }] = await Promise.all([
-        supabase.from('evaluations').select('*').eq('id', id).maybeSingle(),
-        supabase.from('evaluation_agents').select('*').eq('evaluation_id', id).order('created_at'),
-      ]);
-      if (ev) setEvaluation(ev as Evaluation);
-      if (ag) setAgents(ag as EvaluationAgent[]);
+      const response=await fetch(`/api/evaluations/${id}`, { cache:'no-store' });
+      if (response.ok) { const data=await response.json(); setEvaluation(data.evaluation); setAgents(data.agents); }
       setLoading(false);
     }
     fetchData();

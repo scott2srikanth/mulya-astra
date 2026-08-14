@@ -4,14 +4,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { GitBranch, ArrowLeft, ExternalLink, RefreshCw, FileText, Clock, Cpu, Code as Code2, Eye, Brain, Shield, Users, CircleCheck as CheckCircle2, TriangleAlert as AlertTriangle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import type { Evaluation, EvaluationAgent, EvaluationLog } from '@/types/database';
+import type { AnalysisFinding, CategoryScore, Evaluation, EvaluationAgent, EvaluationLog } from '@/types/database';
 import ScoreGauge from '@/components/ScoreGauge';
 import StatusBadge from '@/components/StatusBadge';
 import GradeTag from '@/components/GradeTag';
 import HiringBadge from '@/components/HiringBadge';
 import TerminalLog from '@/components/TerminalLog';
 import AgentCard from '@/components/AgentCard';
+import ManualAiReview from '@/components/ManualAiReview';
 
 const PIPELINE_STEPS = [
   { key: 'clone', label: 'Clone Repository', icon: GitBranch },
@@ -31,14 +31,13 @@ function getStepStatus(currentStep: string, stepKey: string, progress: number): 
 }
 
 const SCORE_CATEGORIES = [
-  { key: 'coding_score', label: 'Coding Skills', max: 25 },
+  { key: 'coding_score', label: 'Implementation', max: 20 },
   { key: 'architecture_score', label: 'Architecture', max: 15 },
-  { key: 'ui_ux_score', label: 'UI/UX', max: 15 },
-  { key: 'problem_solving_score', label: 'Problem Solving', max: 15 },
-  { key: 'ai_engineering_score', label: 'AI Engineering', max: 10 },
+  { key: 'ui_ux_score', label: 'Testing', max: 15 },
+  { key: 'problem_solving_score', label: 'Code Quality', max: 15 },
+  { key: 'ai_engineering_score', label: 'Documentation', max: 15 },
   { key: 'performance_score', label: 'Performance', max: 10 },
-  { key: 'code_quality_score', label: 'Code Quality', max: 5 },
-  { key: 'documentation_score', label: 'Documentation', max: 5 },
+  { key: 'code_quality_score', label: 'Security', max: 10 },
 ] as const;
 
 export default function EvaluationPage() {
@@ -47,38 +46,20 @@ export default function EvaluationPage() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [agents, setAgents] = useState<EvaluationAgent[]>([]);
   const [logs, setLogs] = useState<EvaluationLog[]>([]);
+  const [findings, setFindings] = useState<AnalysisFinding[]>([]);
+  const [categoryScores, setCategoryScores] = useState<CategoryScore[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
-    const [{ data: ev }, { data: ag }, { data: lg }] = await Promise.all([
-      supabase.from('evaluations').select('*').eq('id', id).maybeSingle(),
-      supabase.from('evaluation_agents').select('*').eq('evaluation_id', id).order('created_at'),
-      supabase.from('evaluation_logs').select('*').eq('evaluation_id', id).order('created_at'),
-    ]);
-    if (ev) setEvaluation(ev as Evaluation);
-    if (ag) setAgents(ag as EvaluationAgent[]);
-    if (lg) setLogs(lg as EvaluationLog[]);
+    const response=await fetch(`/api/evaluations/${id}`, { cache:'no-store' });
+    if (response.ok) { const data=await response.json(); setEvaluation(data.evaluation); setAgents(data.agents); setLogs(data.logs); setFindings(data.findings||[]); setCategoryScores(data.categoryScores||[]); }
     setLoading(false);
   }, [id]);
 
   useEffect(() => {
     fetchAll();
-    const channel = supabase
-      .channel(`eval-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'evaluations', filter: `id=eq.${id}` },
-        (payload) => { if (payload.new) setEvaluation(payload.new as Evaluation); }
-      )
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'evaluation_agents', filter: `evaluation_id=eq.${id}` },
-        (payload) => { setAgents(prev => [...prev, payload.new as EvaluationAgent]); }
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'evaluation_agents', filter: `evaluation_id=eq.${id}` },
-        (payload) => { setAgents(prev => prev.map(a => a.id === payload.new.id ? payload.new as EvaluationAgent : a)); }
-      )
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'evaluation_logs', filter: `evaluation_id=eq.${id}` },
-        (payload) => { setLogs(prev => [...prev, payload.new as EvaluationLog]); }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const timer=setInterval(fetchAll, 1500);
+    return () => clearInterval(timer);
   }, [id, fetchAll]);
 
   if (loading) {
@@ -223,14 +204,18 @@ export default function EvaluationPage() {
             <h3 className="text-sm font-semibold text-foreground mb-4">Score Breakdown</h3>
             <div className="space-y-3">
               {SCORE_CATEGORIES.map((cat) => {
-                const score = evaluation[cat.key as keyof Evaluation] as number | null;
-                const pct = score !== null ? (score / cat.max) * 100 : 0;
+                const category=cat.label==='Code Quality'?'quality':cat.label.toLowerCase() as CategoryScore['category'];
+                const stored=categoryScores.find(item=>item.category===category);
+                const noSource=evaluation.repo_stats?.analyzed_file_count===0;
+                const score=noSource?(category==='documentation'?Math.min(5,stored?.score||5):0):(stored?.score??evaluation[cat.key as keyof Evaluation] as number|null);
+                const max=stored?.max_score??cat.max;
+                const pct = score !== null ? (score / max) * 100 : 0;
                 return (
                   <div key={cat.key}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">{cat.label}</span>
                       <span className="text-xs font-bold text-foreground tabular-nums">
-                        {score !== null ? `${score}/${cat.max}` : `—/${cat.max}`}
+                        {score !== null ? `${score}/${max}` : `—/${max}`}
                       </span>
                     </div>
                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -323,6 +308,32 @@ export default function EvaluationPage() {
               </div>
             )}
           </div>
+
+          {evaluation.assignment_results && (
+            <div className="glass-card p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4"><div><h3 className="text-sm font-semibold">Instructor Assignment Compliance</h3><p className="text-xs text-muted-foreground mt-1">Deterministic repository evidence; semantic checks continue in Manual ChatGPT Review.</p></div><div className="flex gap-2"><span className="px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 text-xs font-bold">Compliance {evaluation.assignment_results.compliance_score}%</span><span className="px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 text-xs font-bold">Engineering {evaluation.assignment_results.engineering_score}%</span></div></div>
+              <div className="space-y-2">{evaluation.assignment_results.checks.map(check=><div key={check.id} className="flex gap-3 rounded-lg border border-border p-3"><span className={`text-xs font-bold uppercase ${check.status==='passed'?'text-emerald-400':check.status==='failed'?'text-rose-400':'text-amber-400'}`}>{check.status.replace('_',' ')}</span><div><p className="text-sm">{check.requirement}</p><p className="text-xs text-muted-foreground mt-1">{check.explanation}</p>{check.evidence.length>0&&<p className="text-xs font-mono text-sky-400 mt-1">{check.evidence.join(' · ')}</p>}</div></div>)}</div>
+            </div>
+          )}
+
+          {/* Summary */}
+          {isCompleted && <ManualAiReview evaluationId={id} />}
+
+          {/* Summary */}
+          {findings.length > 0 && (
+            <div className="glass-card p-5">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Evidence-backed Findings</h3>
+              <div className="space-y-3">
+                {findings.map(f => <div key={f.id} className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold">{f.title}</p><span className={`text-[10px] uppercase font-bold ${['critical','high'].includes(f.severity)?'text-rose-400':f.severity==='medium'?'text-amber-400':'text-sky-400'}`}>{f.severity}</span></div>
+                  <p className="text-xs text-muted-foreground mt-1">{f.explanation}</p>
+                  {f.file_path && <p className="text-xs text-sky-400 font-mono mt-2">{f.file_path}{f.start_line?`:${f.start_line}`:''}</p>}
+                  <p className="text-xs text-muted-foreground font-mono mt-2 bg-black/10 rounded p-2">{f.evidence}</p>
+                  {f.recommendation && <p className="text-xs text-emerald-400 mt-2">Recommendation: {f.recommendation}</p>}
+                </div>)}
+              </div>
+            </div>
+          )}
 
           {/* Summary */}
           {evaluation.summary && (
